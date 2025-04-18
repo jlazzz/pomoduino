@@ -1,13 +1,23 @@
-/* SevSeg Counter Example
- 
- Copyright 2020 Dean Reading
- 
- This example demonstrates a very simple use of the SevSeg library with a 4
- digit display. It displays a counter that counts up, showing deci-seconds.
- */
-
 #include "SevSeg.h"
-SevSeg sevseg; //Instantiate a seven segment controller object
+
+SevSeg sevseg;
+bool ledState = false;
+int buttonThreshold = 512;
+
+unsigned long ledPreviousMillis = 0;
+unsigned long ledBlinkInterval = 1000;
+unsigned long patternPreviousMillis = 0;
+unsigned long patternInterval = 55;
+unsigned long lastButtonPressTime = 0;
+unsigned long debounceDelay = 50;
+
+int sequenceStep = 0;
+
+enum LedColor {
+  GREEN, 
+  BLUE, 
+  OFF
+};
 
 
 int convertToMMSS(int totalSeconds) {
@@ -20,11 +30,17 @@ int convertToMMSS(int totalSeconds) {
 }
 
 int checkButtonPress(){
-  if (analogRead(A0) > 512){
-    return 1;
+  if (analogRead(A0) > 512) {  
+    if (millis() - lastButtonPressTime > debounceDelay) {
+      lastButtonPressTime = millis();
+      byte blankDigits[] = {0, 0, 0, 0};
+      sevseg.setSegments(blankDigits);
+      return 1;
+    }
   }
   return 0;
 }
+
 int checkSecondElapsed(unsigned long millis_old){
   if (millis() - millis_old > 1000){
     return 1;
@@ -32,7 +48,7 @@ int checkSecondElapsed(unsigned long millis_old){
   return 0;
 }
 
-int countDownMinutes(int minutes){
+int countdownMinutes(int minutes){
   int seconds_remaining = minutes * 60;
   unsigned long millis_old = millis();
   
@@ -55,35 +71,84 @@ int setAllLights(uint8_t state){
   digitalWrite(0, state);
   digitalWrite(1, state);
 }
-int waitForButtonPress(){
-  bool button_state = 0;
-  while(button_state == 0){
-    setAllLights(HIGH);
-    for (int i = 0; i < 250; i++){
-      delay(1);
-      if (analogRead(A0) > 512){
-        button_state = 1;
-        break;
+
+int checkMillisElapsed(unsigned long millis_old, int ms) {
+  if (millis() - millis_old >= ms) {
+    return 1;
+  }
+  return 0;
+}
+
+void iterateWaitingPattern() {
+    byte steps[] = {
+    0b00000011, // a + b
+    0b01000011, // a + b + g
+    0b01000010, // b + g
+    0b01010010, // b + g + e
+    0b01010000, // g + e
+    0b01011000, // g + e + d
+    0b00011000, // e + d
+    0b00011100, // e + d + c
+    0b00001100, // d + c
+    0b01001100, // d + c + g
+    0b01000100, // c + g
+    0b01100100, // c + g + f
+    0b01100000, // g + f
+    0b01100001, // g + f + a
+    0b00100001  // f + a
+  };
+  int totalSteps = sizeof(steps) / sizeof(steps[0]);
+  byte segmentPattern = steps[sequenceStep];
+
+  byte segments[4] = {
+    segmentPattern,
+    segmentPattern,
+    segmentPattern,
+    segmentPattern
+  };
+
+  sevseg.setSegments(segments);
+  sevseg.refreshDisplay();
+
+  sequenceStep = (sequenceStep + 1) % totalSteps;
+}
+
+void waitForButtonPress() {
+  bool buttonPressed = false;
+
+  while (!buttonPressed) {
+    unsigned long currentMillis = millis();
+    sevseg.refreshDisplay();
+
+    if (checkButtonPress()) {
+      if (currentMillis - lastButtonPressTime > debounceDelay) {
+        buttonPressed = true;
+        lastButtonPressTime = currentMillis;
       }
     }
-    setAllLights(LOW);
-    for (int i = 0; i < 250; i++){
-      delay(1);
-      if (analogRead(A0) > 512){
-        button_state = 1;
-        break;
-      }
+
+    if (currentMillis - ledPreviousMillis >= ledBlinkInterval) {
+      ledPreviousMillis = currentMillis;
+      ledState = !ledState;
+      setAllLights(ledState ? HIGH : LOW);
+    }
+
+    if (currentMillis - patternPreviousMillis >= patternInterval) {
+      patternPreviousMillis = currentMillis;
+      iterateWaitingPattern();
     }
   }
 }
-void delaySevSeg(int seconds){
+
+void delaySevSeg(int milliseconds) {
   unsigned long millis_old = millis();
-  int seconds_elapsed = 0;
-  while(seconds_elapsed < seconds){
-    if (checkSecondElapsed(millis_old)){
-      seconds_elapsed++;
+  int ms_elapsed = 0;
+  while (ms_elapsed < milliseconds) {
+    if (checkMillisElapsed(millis_old, 1)) {
+      ms_elapsed++;
+      millis_old = millis();
     }
-    sevseg.refreshDisplay(); // Must run repeatedly
+    sevseg.refreshDisplay();
   }
 }
 
@@ -93,28 +158,24 @@ void setup() {
   byte numDigits = 4;
   byte digitPins[] = {2, 3, 4, 5};
   byte segmentPins[] = {6, 7, 8, 9, 10, 11, 12, 13};
-  bool resistorsOnSegments = false; // 'false' means resistors are on digit pins
-  byte hardwareConfig = COMMON_ANODE; // See README.md for options
-  bool updateWithDelays = false; // Default 'false' is Recommended
-  bool leadingZeros = false; // Use 'true' if you'd like to keep the leading zeros
-  bool disableDecPoint = false; // Use 'true' if your decimal point doesn't exist or isn't connected
+  bool resistorsOnSegments = false;
+  byte hardwareConfig = COMMON_ANODE;
+  bool updateWithDelays = false;
+  bool leadingZeros = false;
+  bool disableDecPoint = false;
   
   sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
   updateWithDelays, leadingZeros, disableDecPoint);
-  sevseg.setBrightness(90);
+  sevseg.setBrightness(50);
 }
 
 void loop() {
-  countDownMinutes(25);
-  //sevseg.setNumber(1, 2);
-  delaySevSeg(1);
-  //waitForButtonPress();
-  //delaySevSeg(1000);
-  countDownMinutes(5);
-  //sevseg.setNumber(0, 2);
-  delaySevSeg(1);
-  //waitForButtonPress();
-  //delaySevSeg(1000);
+  countdownMinutes(25);
+  delaySevSeg(250);
+  waitForButtonPress();
+  delaySevSeg(250);
+  countdownMinutes(5);
+  delaySevSeg(250);
+  waitForButtonPress();
+  delaySevSeg(250);
 }
-
-/// END ///
