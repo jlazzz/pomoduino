@@ -1,4 +1,7 @@
 #include "SevSeg.h"
+#define POMO_TIME_MINUTES 25
+#define BREAK_TIME_MINUTES 5
+
 #define MAX_LED_INDICES 2
 
 SevSeg sevseg;
@@ -176,6 +179,16 @@ void delaySevSeg(int milliseconds) {
   }
 }
 
+void runPomodoro(void){
+  setLedColor(COLOR_GREEN);
+  countdownMinutes(POMO_TIME_MINUTES);
+}
+void runBreak(void){
+  setLedColor(COLOR_BLUE);
+  countdownMinutes(BREAK_TIME_MINUTES);
+}
+
+
 void setup() {
   pinMode(0, OUTPUT);
   pinMode(1, OUTPUT);
@@ -194,12 +207,15 @@ void setup() {
 }
 
 void loop() {
-  countdownMinutes(25);
+  runPomodoro();
   delaySevSeg(250);
+
   waitForButtonPress();
   delaySevSeg(250);
-  countdownMinutes(5);
+
+  runBreak();
   delaySevSeg(250);
+
   waitForButtonPress();
   delaySevSeg(250);
 }
