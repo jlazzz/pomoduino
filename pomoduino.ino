@@ -33,6 +33,16 @@ ColorLedMap color_led_map[COLOR_COUNT] = {
     {{},          0 }          // COLOR_NONE
 };
 
+void setLedColor(Color color) {
+  if (color >= COLOR_COUNT) {
+      return -1;
+  }
+  setAllLights(LOW);
+  for (int i = 0; i < color_led_map[color].num_leds; i++) {
+      int led_index = color_led_map[color].led_indices[i];
+      digitalWrite(led_index, HIGH);
+  }
+}
 
 int convertToMMSS(int totalSeconds) {
     int minutes = totalSeconds / 60;
