@@ -1,4 +1,5 @@
 #include "SevSeg.h"
+#define MAX_LED_INDICES 2
 
 SevSeg sevseg;
 bool ledState = false;
@@ -13,10 +14,23 @@ unsigned long debounceDelay = 50;
 
 int sequenceStep = 0;
 
-enum LedColor {
-  GREEN, 
-  BLUE,
-  OFF
+typedef enum {
+    COLOR_BLUE,
+    COLOR_GREEN,
+    COLOR_ALL,
+    COLOR_NONE,
+    COLOR_COUNT
+} Color;
+typedef struct {
+    int led_indices[MAX_LED_INDICES];
+    int num_leds;
+} ColorLedMap;
+
+ColorLedMap color_led_map[COLOR_COUNT] = {
+    {{0},         1 },         // COLOR_BLUE
+    {{1},         1 },         // COLOR_GREEN
+    {{0, 1},      2 },         // COLOR_ALL
+    {{},          0 }          // COLOR_NONE
 };
 
 
