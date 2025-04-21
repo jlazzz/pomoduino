@@ -15,7 +15,7 @@ int sequenceStep = 0;
 
 enum LedColor {
   GREEN, 
-  BLUE, 
+  BLUE,
   OFF
 };
 
